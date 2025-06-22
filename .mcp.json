@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ecb-data": {
+      "command": "python",
+      "args": ["-m", "src.mcp_ecb_server"],
+      "env": {}
+    }
+  }
+}

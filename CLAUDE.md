@@ -15,6 +15,12 @@ Building a Streamlit application for writing natural language analytics and disp
 - Set up CI/CD pipelines through GitHub Actions
 - Focus on defensive security practices only
 
+## Common Commands
+- `source $HOME/.local/bin/env && cd src && uv run streamlit run app.py` - Run Streamlit app
+- `source $HOME/.local/bin/env && uv sync` - Sync dependencies
+- `source $HOME/.local/bin/env && uv add <package>` - Add new dependency
+- `git add . && git commit -m "message" && git push` - Commit and push changes
+
 ## Application Architecture
 - **Frontend**: Streamlit for user interface
 - **Analytics**: Natural language processing for analytics queries
