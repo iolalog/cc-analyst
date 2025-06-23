@@ -14,8 +14,8 @@ try:
     from ..data_source_interface import DataSourceInterface
     from ..logger_config import log_api_call, setup_logger
 except ImportError:
-    import sys
     import os
+    import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from data_source_interface import DataSourceInterface
     from logger_config import log_api_call, setup_logger
@@ -42,6 +42,12 @@ class ECBDataSource(DataSourceInterface):
             "DFR": "FM/B.U2.EUR.4F.KR.DFR.LEV",  # Deposit Facility Rate
             "MLF": "FM/B.U2.EUR.4F.KR.MLFR_FR.LEV",  # Marginal Lending Facility Rate
         }
+        
+        # ECB inflation dataset mappings
+        self._inflation_mappings: dict[str, str] = {
+            "HICP": "ICP/M.U2.N.000000.4.ANR",  # Harmonised Index of Consumer Prices - Total
+            "CORE": "ICP/M.U2.N.XEF000.4.ANR",  # Core inflation (excluding energy, food)
+        }
 
         self.logger.info("ECB data source initialized")
 
@@ -57,6 +63,7 @@ class ECBDataSource(DataSourceInterface):
         """Return supported ECB datasets."""
         return {
             "interest_rates": "ECB Key Interest Rates (MRR, DFR, MLF)",
+            "inflation_rates": "Harmonised Index of Consumer Prices (HICP)",
             "money_market": "Money Market Rates",
             "government_bonds": "Government Bond Yields",
             "exchange_rates": "Euro Exchange Rates",
@@ -86,13 +93,15 @@ class ECBDataSource(DataSourceInterface):
 
             if dataset_type == "interest_rates":
                 return self._get_interest_rates(parameters)
+            elif dataset_type == "inflation_rates":
+                return self._get_inflation_rates(parameters)
             else:
                 error_msg = f"Dataset type '{dataset_type}' not yet implemented"
                 self.logger.warning(error_msg)
                 return {
                     "success": False,
                     "error": error_msg,
-                    "message": "Only interest_rates dataset is currently supported",
+                    "message": "Only interest_rates and inflation_rates datasets are currently supported",
                 }
 
         except Exception as e:
@@ -206,16 +215,118 @@ class ECBDataSource(DataSourceInterface):
             "message": f"Successfully fetched ECB rates: {', '.join(rate_types)}",
         }
 
+    def _get_inflation_rates(self, parameters: dict[str, Any]) -> dict[str, Any]:
+        """Fetch ECB inflation data."""
+        inflation_types = parameters.get("inflation_types", ["HICP"])
+        start_date = parameters.get("start_date")
+        end_date = parameters.get("end_date")
+
+        results: dict[str, Any] = {}
+
+        for inflation_type in inflation_types:
+            if inflation_type in self._inflation_mappings:
+                dataset_id = self._inflation_mappings[inflation_type]
+
+                params = {"format": "jsondata"}
+                if start_date:
+                    params["startPeriod"] = start_date
+                if end_date:
+                    params["endPeriod"] = end_date
+
+                url = f"{self.BASE_URL}/{dataset_id}"
+
+                start_time = time.time()
+                self.logger.debug(
+                    f"Fetching {inflation_type} from {url} with params {params}"
+                )
+
+                try:
+                    response = self.session.get(url, params=params)
+                    duration = time.time() - start_time
+
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            results[inflation_type] = self._parse_ecb_json_data(data)
+                            log_api_call(
+                                self.logger, "ecb", f"fetch_{inflation_type}", True, duration
+                            )
+                        except json.JSONDecodeError:
+                            # Try CSV format if JSON fails
+                            self.logger.warning(
+                                f"JSON decode failed for {inflation_type}, trying CSV format"
+                            )
+                            params["format"] = "csvdata"
+                            response = self.session.get(url, params=params)
+                            if response.status_code == 200:
+                                results[inflation_type] = self._parse_ecb_csv_data(
+                                    response.text
+                                )
+                                log_api_call(
+                                    self.logger,
+                                    "ecb",
+                                    f"fetch_{inflation_type}_csv",
+                                    True,
+                                    duration,
+                                )
+                            else:
+                                error_msg = (
+                                    f"CSV fetch failed: HTTP {response.status_code}"
+                                )
+                                results[inflation_type] = {"error": error_msg}
+                                log_api_call(
+                                    self.logger,
+                                    "ecb",
+                                    f"fetch_{inflation_type}_csv",
+                                    False,
+                                    duration,
+                                    error_msg,
+                                )
+                    else:
+                        error_msg = (
+                            f"Failed to fetch {inflation_type}: HTTP {response.status_code}"
+                        )
+                        results[inflation_type] = {"error": error_msg}
+                        log_api_call(
+                            self.logger,
+                            "ecb",
+                            f"fetch_{inflation_type}",
+                            False,
+                            duration,
+                            error_msg,
+                        )
+
+                except Exception as e:
+                    duration = time.time() - start_time
+                    error_msg = f"Request failed for {inflation_type}: {str(e)}"
+                    results[inflation_type] = {"error": error_msg}
+                    log_api_call(
+                        self.logger,
+                        "ecb",
+                        f"fetch_{inflation_type}",
+                        False,
+                        duration,
+                        error_msg,
+                    )
+
+        return {
+            "success": True,
+            "data": results,
+            "message": f"Successfully fetched ECB inflation data: {', '.join(inflation_types)}",
+        }
+
     def _parse_ecb_json_data(self, json_data: dict[str, Any]) -> dict[str, Any]:
         """Parse ECB JSON response into structured data."""
         try:
             if "dataSets" in json_data and json_data["dataSets"]:
                 dataset = json_data["dataSets"][0]
-                observations = (
-                    dataset.get("series", {})
-                    .get("0:0:0:0:0:0:0", {})
-                    .get("observations", {})
-                )
+                series_data = dataset.get("series", {})
+                
+                # Find the first (and usually only) series key
+                observations = {}
+                if series_data:
+                    first_series_key = next(iter(series_data.keys()))
+                    observations = series_data[first_series_key].get("observations", {})
 
                 # Extract time periods and values
                 time_periods = json_data["structure"]["dimensions"]["observation"][0][
@@ -299,23 +410,35 @@ class ECBDataSource(DataSourceInterface):
                         f"Valid rate types are: {list(self._rate_mappings.keys())}"
                     )
 
-            # Validate date format
-            for date_param in ["start_date", "end_date"]:
-                if date_param in parameters and parameters[date_param] is not None:
-                    try:
-                        datetime.strptime(parameters[date_param], "%Y-%m-%d")
-                    except ValueError:
-                        errors.append(
-                            f"Invalid {date_param} format: {parameters[date_param]}"
-                        )
-                        suggestions.append(
-                            f"{date_param} should be in YYYY-MM-DD format"
-                        )
+        elif dataset_type == "inflation_rates":
+            inflation_types = parameters.get("inflation_types", [])
+            if inflation_types:
+                invalid_inflation = [
+                    rate for rate in inflation_types if rate not in self._inflation_mappings
+                ]
+                if invalid_inflation:
+                    errors.append(f"Invalid inflation types: {invalid_inflation}")
+                    suggestions.append(
+                        f"Valid inflation types are: {list(self._inflation_mappings.keys())}"
+                    )
 
         else:
             errors.append(f"Dataset type '{dataset_type}' not supported")
             suggestions.append(
                 f"Supported datasets: {list(self.get_supported_datasets().keys())}"
             )
+
+        # Validate date format for all dataset types
+        for date_param in ["start_date", "end_date"]:
+            if date_param in parameters and parameters[date_param] is not None:
+                try:
+                    datetime.strptime(parameters[date_param], "%Y-%m-%d")
+                except ValueError:
+                    errors.append(
+                        f"Invalid {date_param} format: {parameters[date_param]}"
+                    )
+                    suggestions.append(
+                        f"{date_param} should be in YYYY-MM-DD format"
+                    )
 
         return {"valid": len(errors) == 0, "errors": errors, "suggestions": suggestions}

@@ -14,12 +14,20 @@ Building a Streamlit application for writing natural language analytics and disp
 - Leverage GitHub CLI (`gh`) for repository operations
 - Set up CI/CD pipelines through GitHub Actions
 - Focus on defensive security practices only
+- **ALWAYS run tests after making code changes** - especially after major modifications
+- Run linting and type checking before committing
 
 ## Common Commands
 - `source .venv/bin/activate && PYTHONPATH=src streamlit run src/app.py` - Run Streamlit app
 - `source .venv/bin/activate && uv sync` - Sync dependencies
 - `source .venv/bin/activate && uv add <package>` - Add new dependency
 - `git add . && git commit -m "message" && git push` - Commit and push changes
+
+## Testing Commands (REQUIRED after code changes)
+- `source .venv/bin/activate && python test_runner.py` - Run all tests with coverage
+- `source .venv/bin/activate && uv run pytest tests/` - Run tests directly
+- `source .venv/bin/activate && uv run ruff check src/` - Run linting
+- `source .venv/bin/activate && uv run mypy src/` - Run type checking
 
 ## Application Architecture
 - **Frontend**: Streamlit for user interface

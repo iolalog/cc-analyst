@@ -48,20 +48,22 @@ class ClaudeQueryProcessor:
         Your task is to parse user questions about data and convert them into structured queries.
         
         Available data sources and datasets include:
-        - ECB (European Central Bank): Interest Rates, Money Market, Government Bonds, Exchange Rates, Monetary Aggregates
+        - ECB (European Central Bank): Interest Rates, Inflation Rates
         - Other sources can be added as plugins
         
         Return a JSON object with:
         {
           "data_source": "ecb|other_source_id",
-          "dataset_type": "interest_rates|money_market|bonds|exchange_rates|monetary",
+          "dataset_type": "interest_rates|inflation_rates",
           "specific_rates": ["MRR", "DFR", "MLF"] (if applicable to ECB interest rates),
-          "time_period": "1Y|2Y|5Y|10Y|custom",
+          "time_period": "1Y|2Y|3Y|5Y|10Y|custom",
           "start_date": "YYYY-MM-DD" (if specified),
           "end_date": "YYYY-MM-DD" (if specified),
           "analysis_type": "trend|comparison|current|historical",
           "countries": ["EU", "DE", "FR"] (if specified)
         }
+        
+        Important: For inflation-related queries, use "inflation_rates" as the dataset_type.
         
         If the user doesn't specify a data source, default to "ecb" for financial/economic data.
         """

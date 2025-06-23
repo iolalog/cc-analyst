@@ -118,6 +118,29 @@ if processors_available and st.button("Analyze", type="primary"):
                             parameters["start_date"] = (
                                 datetime.now() - timedelta(days=365)
                             ).strftime("%Y-%m-%d")
+                            
+                elif dataset_type == "inflation_rates":
+                    parameters["inflation_types"] = parsed_query.get(
+                        "specific_rates", ["HICP"]
+                    )
+                    parameters["start_date"] = parsed_query.get("start_date")
+                    parameters["end_date"] = parsed_query.get("end_date")
+
+                    # Set default date range if not specified
+                    if not parameters["start_date"]:
+                        if parsed_query.get("time_period") == "3Y":
+                            parameters["start_date"] = (
+                                datetime.now() - timedelta(days=1095)
+                            ).strftime("%Y-%m-%d")
+                        elif parsed_query.get("time_period") == "5Y":
+                            parameters["start_date"] = (
+                                datetime.now() - timedelta(days=1825)
+                            ).strftime("%Y-%m-%d")
+                        else:
+                            # Default to 3 years for inflation
+                            parameters["start_date"] = (
+                                datetime.now() - timedelta(days=1095)
+                            ).strftime("%Y-%m-%d")
 
                 # Query data using the generic data manager
                 data_result = data_manager.query_data(
@@ -169,14 +192,14 @@ if processors_available and st.button("Analyze", type="primary"):
             viz_data: list[dict[str, Any]] = []
             data = data_result["data"]
 
-            for rate_type, rate_data in data.items():
-                if "observations" in rate_data:
-                    for obs in rate_data["observations"]:
+            for data_type, data_info in data.items():
+                if "observations" in data_info:
+                    for obs in data_info["observations"]:
                         if obs["value"] is not None:
                             viz_data.append(
                                 {
                                     "Date": pd.to_datetime(obs["date"]),
-                                    "Rate_Type": rate_type,
+                                    "Data_Type": data_type,
                                     "Value": obs["value"],
                                 }
                             )
@@ -185,29 +208,46 @@ if processors_available and st.button("Analyze", type="primary"):
                 df = pd.DataFrame(viz_data)
 
                 # Create interactive plot
-                chart_title = f"{data_source.upper()} {dataset_type.replace('_', ' ').title()} Over Time"
+                chart_title = (
+                    f"{data_source.upper()} {dataset_type.replace('_', ' ').title()} Over Time"
+                )
+                value_label = (
+                    "Rate (%)" if dataset_type == "interest_rates" else "Rate (%)"
+                )
+                type_label = (
+                    "Rate Type" if dataset_type == "interest_rates" else "Data Type"
+                )
+                
                 fig = px.line(
                     df,
                     x="Date",
                     y="Value",
-                    color="Rate_Type",
+                    color="Data_Type",
                     title=chart_title,
-                    labels={"Value": "Rate (%)", "Rate_Type": "Rate Type"},
+                    labels={"Value": value_label, "Data_Type": type_label},
                 )
 
                 fig.update_layout(height=500, showlegend=True)
                 st.plotly_chart(fig, use_container_width=True)
 
                 # Show current values
-                st.subheader("📋 Current Rates")
+                current_title = (
+                    "📋 Current Rates" if dataset_type == "interest_rates" 
+                    else "📋 Current Values"
+                )
+                st.subheader(current_title)
                 cols = st.columns(len(data))
 
-                for i, (rate_type, rate_data) in enumerate(data.items()):
-                    if "observations" in rate_data and rate_data["observations"]:
-                        latest_obs = rate_data["observations"][-1]
+                for i, (data_type, data_info) in enumerate(data.items()):
+                    if "observations" in data_info and data_info["observations"]:
+                        latest_obs = data_info["observations"][-1]
                         if latest_obs["value"] is not None:
+                            metric_label = (
+                                f"{data_type} Rate" if dataset_type == "interest_rates" 
+                                else f"{data_type}"
+                            )
                             cols[i].metric(
-                                f"{rate_type} Rate",
+                                metric_label,
                                 f"{latest_obs['value']:.2f}%",
                                 delta=None,
                             )
