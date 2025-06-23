@@ -1,22 +1,26 @@
-# ECB Analytics Assistant 📊
+# Analytics Assistant 📊
 
-A Streamlit web application for natural language analytics of European Central Bank (ECB) data. Ask questions in plain English and get AI-powered insights with interactive visualizations.
+A Streamlit web application for natural language analytics and visualization based on various data sources using MCP (Model Context Protocol). Ask questions in plain English and get AI-powered insights with interactive visualizations.
+
+Currently configured with European Central Bank (ECB) data as the primary example data source.
 
 ## Features
 
-- **Natural Language Queries**: Ask questions about ECB data in plain English
-- **Real-time ECB Data**: Fetches live interest rates from ECB Statistical Data Warehouse
+- **Natural Language Queries**: Ask questions about data in plain English
+- **Multiple Data Sources**: Extensible architecture for connecting to various data sources via MCP
 - **AI-Powered Analysis**: Claude AI provides insights and explanations
 - **Interactive Visualizations**: Dynamic charts with Plotly
-- **Key Interest Rates**: Main Refinancing Rate (MRR), Deposit Facility Rate (DFR), Marginal Lending Facility Rate (MLF)
+- **Current Data Source**: European Central Bank (ECB) Statistical Data Warehouse
+  - Key Interest Rates: Main Refinancing Rate (MRR), Deposit Facility Rate (DFR), Marginal Lending Facility Rate (MLF)
 
 ## Architecture
 
 - **Frontend**: Streamlit for user interface
-- **Data Source**: ECB Statistical Data Warehouse API
+- **Data Sources**: Multiple data source connections via MCP (Model Context Protocol)
 - **AI Processing**: Claude API for natural language understanding and analysis
 - **Visualization**: Plotly for interactive charts
 - **Data Handling**: Pandas for data manipulation
+- **Current Implementation**: ECB Statistical Data Warehouse API as example data source
 
 ## Prerequisites
 
@@ -28,8 +32,8 @@ A Streamlit web application for natural language analytics of European Central B
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/iolalog/cc-analyst.git
-   cd cc-analyst
+   git clone https://github.com/iolalog/analytics-assistant.git
+   cd analytics-assistant
    ```
 
 2. **Set up environment**:
@@ -38,7 +42,9 @@ A Streamlit web application for natural language analytics of European Central B
    curl -LsSf https://astral.sh/uv/install.sh | sh
    source $HOME/.local/bin/env
    
-   # Install dependencies
+   # Create virtual environment and install dependencies
+   uv venv
+   source .venv/bin/activate
    uv sync
    ```
 
@@ -50,7 +56,7 @@ A Streamlit web application for natural language analytics of European Central B
 
 4. **Run the application**:
    ```bash
-   source $HOME/.local/bin/env && cd src && uv run streamlit run app.py
+   source .venv/bin/activate && PYTHONPATH=src streamlit run src/app.py
    ```
 
 5. **Open your browser** to http://localhost:8501
@@ -75,15 +81,21 @@ A Streamlit web application for natural language analytics of European Central B
 ## Project Structure
 
 ```
-cc-analyst/
+analytics-assistant/
 ├── src/
 │   ├── app.py                 # Main Streamlit application
 │   ├── claude_processor.py    # Claude API integration
-│   └── mcp_ecb_server.py     # ECB data fetching
+│   └── mcp_ecb_server.py     # ECB data fetching (example data source)
+├── tests/                     # Comprehensive test suite
+│   ├── test_claude_processor.py
+│   ├── test_mcp_ecb_server.py
+│   ├── test_app.py
+│   └── test_integration.py
 ├── .env.example              # Environment variables template
 ├── .mcp.json                # MCP server configuration
 ├── CLAUDE.md                # Claude Code instructions
 ├── pyproject.toml           # Project dependencies
+├── test_runner.py           # Test runner script
 └── README.md               # This file
 ```
 
@@ -112,25 +124,79 @@ The app currently supports:
 
 ### Common Commands
 
-```bash
-# Run the app
-source $HOME/.local/bin/env && cd src && uv run streamlit run app.py
+All commands should be run from the project root directory and require activating the uv environment first:
 
-# Sync dependencies
-source $HOME/.local/bin/env && uv sync
+```bash
+# Activate virtual environment (run this first for each new terminal session)
+source .venv/bin/activate
+
+# Run the app
+PYTHONPATH=src streamlit run src/app.py
+
+# Sync dependencies (after pulling changes or updating pyproject.toml)
+uv sync
 
 # Add new dependency
-source $HOME/.local/bin/env && uv add <package>
+uv add <package>
 
 # Commit changes
 git add . && git commit -m "message" && git push
 ```
 
+**Note**: The `source $HOME/.local/bin/env` command activates the uv environment and should be run once per terminal session before running other uv commands.
+
+### Testing
+
+The project includes comprehensive tests for all components:
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install dev dependencies
+uv sync --extra dev
+
+# Run all tests with coverage
+PYTHONPATH=src pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Run specific test file
+PYTHONPATH=src pytest tests/test_claude_processor.py -v
+
+# Run tests with HTML coverage report
+PYTHONPATH=src pytest tests/ --cov=src --cov-report=html
+
+# Use the test runner script (recommended)
+python test_runner.py
+```
+
+**Test Coverage**: The test suite covers:
+- Claude API integration and query parsing
+- ECB data server functionality and error handling
+- Integration workflows from query to analysis
+- Data parsing and validation
+- Error scenarios and edge cases
+
+### Linting and Code Quality
+
+```bash
+# Run code formatting and linting
+ruff check src/ tests/
+ruff format src/ tests/
+
+# Run type checking
+mypy src/
+```
+
 ### Adding New Data Sources
 
-1. Extend `ECBDataServer` in `src/mcp_ecb_server.py`
-2. Update query parsing in `src/claude_processor.py`
+The application uses the MCP (Model Context Protocol) for data source integration. To add a new data source:
+
+1. Create a new MCP server class (following the pattern in `src/mcp_ecb_server.py`)
+2. Update query parsing in `src/claude_processor.py` to handle new data types
 3. Add visualization support in `src/app.py`
+4. Update `.mcp.json` configuration to include the new server
+
+**Current Example**: ECB data integration in `src/mcp_ecb_server.py`
 
 ## API References
 

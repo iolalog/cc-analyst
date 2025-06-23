@@ -1,9 +1,16 @@
 {
   "mcpServers": {
-    "ecb-data": {
+    "analytics-assistant": {
       "command": "python",
-      "args": ["-m", "src.mcp_ecb_server"],
-      "env": {}
+      "args": ["-m", "src.data_manager"],
+      "env": {},
+      "description": "Multi-source analytics assistant with plugin-based data sources"
+    },
+    "ecb-data": {
+      "command": "python", 
+      "args": ["-m", "src.data_sources.ecb_data_source"],
+      "env": {},
+      "description": "European Central Bank Statistical Data Warehouse access"
     }
   }
 }
